@@ -1,0 +1,6 @@
+{
+  "name": "WenLang",
+  "description": "Aplicativo de estudo de idiomas baseado em leitura de textos personalizados, preferências e proficiência linguística com dicionário integrado.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
