@@ -37,6 +37,13 @@ class LangViewModel(application: Application) : AndroidViewModel(application) {
         _isDarkTheme.value = !_isDarkTheme.value
     }
 
+    private val _showFurigana = MutableStateFlow(true) // default to true so users see it immediately
+    val showFurigana: StateFlow<Boolean> = _showFurigana.asStateFlow()
+
+    fun toggleFurigana() {
+        _showFurigana.value = !_showFurigana.value
+    }
+
     private val _correctAnswersCount = MutableStateFlow(0)
     val correctAnswersCount: StateFlow<Int> = _correctAnswersCount.asStateFlow()
 
@@ -110,9 +117,115 @@ class LangViewModel(application: Application) : AndroidViewModel(application) {
             val current = repository.getProfile() ?: UserProfile()
             val reset = current.copy(
                 isOnboarded = false,
+                isAuthCompleted = false, // Also reset auth status to show login screen
                 approvedLanguagesForPosting = "" // Lock posting again
             )
             repository.saveProfile(reset)
+        }
+    }
+
+    // Supabase Auth Integration
+    suspend fun signUpWithSupabase(email: String, password: String, username: String): com.example.data.SupabaseService.AuthResult {
+        val result = com.example.data.SupabaseService.signUp(email, password, username)
+        if (result.success) {
+            viewModelScope.launch {
+                val current = repository.getProfile() ?: UserProfile()
+                val updated = current.copy(
+                    isAuthCompleted = false, // Still need to choose/confirm username and confirm email!
+                    username = result.username ?: username
+                )
+                repository.saveProfile(updated)
+            }
+        }
+        return result
+    }
+
+    suspend fun resendConfirmationEmail(email: String): com.example.data.SupabaseService.AuthResult {
+        return com.example.data.SupabaseService.resendConfirmationEmail(email)
+    }
+
+    suspend fun signInWithSupabase(email: String, password: String): com.example.data.SupabaseService.AuthResult {
+        val result = com.example.data.SupabaseService.signIn(email, password)
+        if (result.success) {
+            viewModelScope.launch {
+                val current = repository.getProfile() ?: UserProfile()
+                val updated = current.copy(
+                    isAuthCompleted = true, // Logged in successfully, username is fetched
+                    username = result.username ?: current.username
+                )
+                repository.saveProfile(updated)
+            }
+        }
+        return result
+    }
+
+    suspend fun handleAuthCallbackToken(accessToken: String): com.example.data.SupabaseService.AuthResult {
+        val result = com.example.data.SupabaseService.getUserByToken(accessToken)
+        if (result.success) {
+            val current = repository.getProfile() ?: UserProfile()
+            val updated = current.copy(
+                isAuthCompleted = true, // Logged in successfully via deep link!
+                username = result.username ?: current.username
+            )
+            repository.saveProfile(updated)
+        }
+        return result
+    }
+
+    fun continueAsGuest() {
+        viewModelScope.launch {
+            val current = repository.getProfile() ?: UserProfile()
+            val updated = current.copy(
+                isAuthCompleted = false, // Still need to choose/confirm username in the next screen!
+                username = "Guest"
+            )
+            repository.saveProfile(updated)
+        }
+    }
+
+    fun completeAuthWithUsername(username: String) {
+        viewModelScope.launch {
+            val current = repository.getProfile() ?: UserProfile()
+            val updated = current.copy(
+                isAuthCompleted = true,
+                username = username
+            )
+            repository.saveProfile(updated)
+        }
+    }
+
+    suspend fun uploadAndSaveAvatar(bytes: ByteArray, userId: String): Boolean {
+        val publicUrl = com.example.data.SupabaseService.uploadAvatar(userId, bytes)
+        val urlToSave = publicUrl ?: "local_fallback"
+        
+        val job = viewModelScope.launch {
+            val current = repository.getProfile() ?: UserProfile()
+            val updated = current.copy(avatarUrl = publicUrl ?: current.avatarUrl)
+            repository.saveProfile(updated)
+            
+            if (publicUrl != null) {
+                com.example.data.SupabaseService.updateAvatarUrlInDb(userId, publicUrl)
+            }
+        }
+        job.join()
+        return publicUrl != null
+    }
+
+    fun saveLocalAvatar(avatarUriOrPath: String) {
+        viewModelScope.launch {
+            val current = repository.getProfile() ?: UserProfile()
+            val updated = current.copy(avatarUrl = avatarUriOrPath)
+            repository.saveProfile(updated)
+        }
+    }
+
+    fun updateCoverPhoto(photoUrl: String) {
+        viewModelScope.launch {
+            val current = repository.getProfile() ?: UserProfile()
+            val updated = current.copy(
+                coverPhoto = photoUrl
+            )
+            repository.saveProfile(updated)
         }
     }
 

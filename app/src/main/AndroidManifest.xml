@@ -23,6 +23,14 @@
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            
+            <!-- Supabase Email Confirmation Callback Deep Link -->
+            <intent-filter android:label="WenLang Auth Callback">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="wenlang" android:host="auth-callback" />
+            </intent-filter>
         </activity>
     </application>
 

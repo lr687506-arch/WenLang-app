@@ -3,6 +3,6 @@
     <item
         android:width="72dp"
         android:height="72dp"
-        android:drawable="@drawable/wenlang_icon_1783092552695"
+        android:drawable="@drawable/wenlang_icon_clean"
         android:gravity="center" />
 </layer-list>

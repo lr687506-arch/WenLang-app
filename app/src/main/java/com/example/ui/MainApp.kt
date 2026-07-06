@@ -41,7 +41,12 @@ fun MainApp(
 
         val profile = profileState
 
-        if (profile == null || !profile.isOnboarded) {
+        if (profile == null || !profile.isAuthCompleted) {
+            WelcomeAuthScreen(
+                viewModel = langViewModel,
+                modifier = modifier
+            )
+        } else if (!profile.isOnboarded) {
             // Show step-by-step Onboarding configuration flow first
             OnboardingScreen(
                 viewModel = langViewModel,

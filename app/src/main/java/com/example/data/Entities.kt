@@ -7,6 +7,7 @@ import androidx.room.PrimaryKey
 data class UserProfile(
     @PrimaryKey val id: Int = 1,
     val isOnboarded: Boolean = false,
+    val isAuthCompleted: Boolean = false,
     val appLanguage: String = "Português",
     val nativeLanguage: String = "Português",
     val secondaryLanguage: String? = null,
@@ -17,7 +18,10 @@ data class UserProfile(
     val studyTimeMinutes: Int = 12,
     val studyGoalMinutes: Int = 30,
     val streak: Int = 3,
-    val bio: String = ""
+    val bio: String = "",
+    val username: String = "Guest",
+    val coverPhoto: String? = null,
+    val avatarUrl: String? = null
 )
 
 @Entity(tableName = "text_items")

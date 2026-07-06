@@ -484,6 +484,7 @@ fun StoryReaderView(
 ) {
     val coroutineScope = rememberCoroutineScope()
     var showTranslation by remember { mutableStateOf(true) }
+    val showFurigana by viewModel.showFurigana.collectAsState()
     var dictionaryWord by remember { mutableStateOf<DictionaryEntry?>(null) }
     var translatingWordState by remember { mutableStateOf<TranslationUiState?>(null) }
 
@@ -632,6 +633,30 @@ fun StoryReaderView(
                     }
                 },
                 actions = {
+                    // Toggle Furigana / Pronunciation guide button
+                    IconButton(
+                        onClick = { viewModel.toggleFurigana() },
+                        modifier = Modifier.testTag("btn_toggle_furigana")
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = if (showFurigana) orangePrimary.copy(alpha = 0.12f) else Color.Transparent,
+                            border = BorderStroke(1.dp, if (showFurigana) orangePrimary else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f)),
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = "あ",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = if (showFurigana) orangePrimary else MaterialTheme.colorScheme.onBackground
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(4.dp))
+
                     // Play TTS / Custom Audio button
                     IconButton(
                         onClick = {
@@ -827,53 +852,35 @@ fun StoryReaderView(
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
 
-                    // Clickable text flows and wraps naturally as a standard paragraph
-                    ClickableText(
-                        text = annotatedString,
-                        onClick = { offset ->
-                            val text = story.content
-                            if (offset >= 0 && offset < text.length) {
-                                var start = offset
-                                while (start > 0 && !text[start - 1].isWhitespace() && text[start - 1] != '.' && text[start - 1] != ',' && text[start - 1] != '?' && text[start - 1] != '!' && text[start - 1] != '、' && text[start - 1] != '。') {
-                                    start--
-                                }
-                                var end = offset
-                                while (end < text.length && !text[end].isWhitespace() && text[end] != '.' && text[end] != ',' && text[end] != '?' && text[end] != '!' && text[end] != '、' && text[end] != '。') {
-                                    end++
-                                }
-                                if (start < end) {
-                                    val clickedWord = text.substring(start, end).trim()
-                                    val cleanWord = clickedWord.replace(Regex("[.,!?()\"、。]"), "")
-                                    if (cleanWord.isNotEmpty()) {
-                                        translatingWordState = TranslationUiState.Loading
-                                        coroutineScope.launch {
-                                            try {
-                                                val res = viewModel.getTranslationAndDefinition(
-                                                    word = cleanWord,
-                                                    story = story,
-                                                    sourceLang = story.language,
-                                                    targetLang = nativeLanguage
-                                                )
-                                                translatingWordState = TranslationUiState.Success(
-                                                    originalWord = res.originalWord,
-                                                    translation = res.translation,
-                                                    customDefinition = res.customDefinition,
-                                                    translatedCustomDefinition = res.translatedCustomDefinition
-                                                )
-                                            } catch (e: Exception) {
-                                                translatingWordState = TranslationUiState.Error(e.message ?: "Erro desconhecido")
-                                            }
-                                        }
-                                    }
+                    // Native Furigana/Ruby rendering with interactive dictionary lookups
+                    RubyText(
+                        text = story.content,
+                        showFurigana = showFurigana,
+                        baseFontSize = 18f,
+                        baseColor = MaterialTheme.colorScheme.onSurface,
+                        rubyColor = orangePrimary,
+                        modifier = Modifier.fillMaxWidth(),
+                        onWordClick = { cleanWord ->
+                            translatingWordState = TranslationUiState.Loading
+                            coroutineScope.launch {
+                                try {
+                                    val res = viewModel.getTranslationAndDefinition(
+                                        word = cleanWord,
+                                        story = story,
+                                        sourceLang = story.language,
+                                        targetLang = nativeLanguage
+                                    )
+                                    translatingWordState = TranslationUiState.Success(
+                                        originalWord = res.originalWord,
+                                        translation = res.translation,
+                                        customDefinition = res.customDefinition,
+                                        translatedCustomDefinition = res.translatedCustomDefinition
+                                    )
+                                } catch (e: Exception) {
+                                    translatingWordState = TranslationUiState.Error(e.message ?: "Erro desconhecido")
                                 }
                             }
-                        },
-                        style = androidx.compose.ui.text.TextStyle(
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            lineHeight = 28.sp
-                        )
+                        }
                     )
 
                     if (showTranslation) {
@@ -1084,3 +1091,170 @@ sealed class TranslationUiState {
     ) : TranslationUiState()
     data class Error(val message: String) : TranslationUiState()
 }
+
+data class RubyToken(
+    val text: String,
+    val ruby: String? = null
+)
+
+fun parseRubyText(input: String): List<RubyToken> {
+    val tokens = mutableListOf<RubyToken>()
+    var i = 0
+    val len = input.length
+    while (i < len) {
+        // Look ahead for "C[R]" pattern where C is not whitespace, and R is inside brackets
+        if (i < len - 3) {
+            val char = input[i]
+            if (!char.isWhitespace() && input[i + 1] == '[') {
+                val closeBracketIndex = input.indexOf(']', i + 2)
+                if (closeBracketIndex != -1) {
+                    val ruby = input.substring(i + 2, closeBracketIndex)
+                    tokens.add(RubyToken(text = char.toString(), ruby = ruby))
+                    i = closeBracketIndex + 1
+                    
+                    // Now, handle spaces immediately following this ruby block
+                    // If we have double spaces (e.g., "  "), we keep a single space.
+                    // If we have a single space (e.g., " "), we discard it (as it is just a delimiter).
+                    var spaceCount = 0
+                    while (i < len && input[i] == ' ') {
+                        spaceCount++
+                        i++
+                    }
+                    if (spaceCount >= 2) {
+                        tokens.add(RubyToken(text = " "))
+                    }
+                    continue
+                }
+            }
+        }
+        
+        // Otherwise, add current character as normal text
+        tokens.add(RubyToken(text = input[i].toString()))
+        i++
+    }
+    
+    // Merge consecutive plain text tokens to optimize rendering
+    val merged = mutableListOf<RubyToken>()
+    var currentPlain = StringBuilder()
+    for (token in tokens) {
+        if (token.ruby == null) {
+            currentPlain.append(token.text)
+        } else {
+            if (currentPlain.isNotEmpty()) {
+                merged.add(RubyToken(text = currentPlain.toString()))
+                currentPlain = StringBuilder()
+            }
+            merged.add(token)
+        }
+    }
+    if (currentPlain.isNotEmpty()) {
+        merged.add(RubyToken(text = currentPlain.toString()))
+    }
+    return merged
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun RubyText(
+    text: String,
+    showFurigana: Boolean,
+    modifier: Modifier = Modifier,
+    baseFontSize: Float = 18f,
+    baseColor: Color = MaterialTheme.colorScheme.onSurface,
+    rubyColor: Color = Color(0xFFFF6734),
+    onWordClick: ((String) -> Unit)? = null
+) {
+    val tokens = remember(text) { parseRubyText(text) }
+    
+    FlowRow(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.Start,
+        verticalArrangement = Arrangement.Center
+    ) {
+        tokens.forEach { token ->
+            if (token.ruby != null) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                    modifier = Modifier
+                        .padding(horizontal = 1.dp)
+                        .clickable(enabled = onWordClick != null) {
+                            onWordClick?.invoke(token.text)
+                        }
+                ) {
+                    if (showFurigana) {
+                        Text(
+                            text = token.ruby,
+                            fontSize = (baseFontSize * 0.55f).sp,
+                            fontWeight = FontWeight.Bold,
+                            color = rubyColor,
+                            maxLines = 1,
+                            lineHeight = (baseFontSize * 0.65f).sp,
+                            textAlign = TextAlign.Center
+                        )
+                    } else {
+                        // Invisible placeholder spacer to maintain vertical alignment and avoid layout shifts when toggled!
+                        Spacer(modifier = Modifier.height((baseFontSize * 0.45f).dp))
+                    }
+                    Text(
+                        text = token.text,
+                        fontSize = baseFontSize.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = baseColor,
+                        lineHeight = baseFontSize.sp,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            } else {
+                // For normal text, split Asian characters individually for single-character dictionary lookups, and keep words together for Western languages
+                val words = remember(token.text) {
+                    val list = mutableListOf<String>()
+                    var current = StringBuilder()
+                    for (char in token.text) {
+                        if (char.isWhitespace() || char == '、' || char == '。' || char == '.' || char == ',' || char == '!' || char == '?') {
+                            if (current.isNotEmpty()) {
+                                list.add(current.toString())
+                                current = StringBuilder()
+                            }
+                            list.add(char.toString())
+                        } else {
+                            val isCjk = char.code in 0x4E00..0x9FFF || char.code in 0x3040..0x309F || char.code in 0x30A0..0x30FF
+                            if (isCjk) {
+                                if (current.isNotEmpty()) {
+                                    list.add(current.toString())
+                                    current = StringBuilder()
+                                }
+                                list.add(char.toString())
+                            } else {
+                                current.append(char)
+                            }
+                        }
+                    }
+                    if (current.isNotEmpty()) {
+                        list.add(current.toString())
+                    }
+                    list
+                }
+                
+                words.forEach { word ->
+                    val cleanWord = word.replace(Regex("[.,!?()\"、。]"), "").trim()
+                    val isClickable = onWordClick != null && cleanWord.isNotEmpty()
+                    Text(
+                        text = word,
+                        fontSize = baseFontSize.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = baseColor,
+                        lineHeight = (baseFontSize * 1.4f).sp,
+                        modifier = Modifier
+                            .clickable(enabled = isClickable) {
+                                if (cleanWord.isNotEmpty()) {
+                                    onWordClick?.invoke(cleanWord)
+                                }
+                            }
+                    )
+                }
+            }
+        }
+    }
+}
+
