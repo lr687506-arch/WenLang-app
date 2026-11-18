@@ -116,7 +116,7 @@ fun WelcomeAuthScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.weight(0.1f))
+            Spacer(modifier = Modifier.height(16.dp))
 
             // Logo and Title Block
             Column(
@@ -180,8 +180,7 @@ fun WelcomeAuthScreen(
             // Interactive screen areas
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
+                    .fillMaxWidth(),
                 contentAlignment = Alignment.TopCenter
             ) {
                 when (screenMode) {
@@ -686,7 +685,7 @@ fun WelcomeAuthScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.weight(0.1f))
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
