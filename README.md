@@ -1,21 +1,36 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# WenLang Android app
 
-# Run and deploy your AI Studio app
+Este repositório contém o aplicativo Android nativo WenLang, desenvolvido em Kotlin e Jetpack Compose.
 
-This contains everything you need to run your app locally.
+## Visualizar o aplicativo
 
-View your app in AI Studio: https://ai.studio/apps/893faddb-fbd1-4eb3-bbba-e7bfb7aad828
+O projeto é um aplicativo Android nativo. A página do Google AI Studio pode exibir o projeto e oferecer o download do APK, mas não substitui a execução da interface Android em um emulador.
 
-## Run Locally
+Para visualizar a interface:
 
-**Prerequisites:**  [Android Studio](https://developer.android.com/studio)
+1. Abra a pasta do projeto no Android Studio.
+2. Aguarde a sincronização do Gradle.
+3. Abra Device Manager e crie/inicie um emulador Android (ou conecte um celular com depuração USB).
+4. Selecione a configuração app e clique em Run.
 
+## Gerar APK localmente
 
-1. Open Android Studio
-2. Select **Open** and choose the directory containing this project
-3. Allow Android Studio to fix any incompatibilities as it imports the project.
-4. Create a file named `.env` in the project directory and set `GEMINI_API_KEY` in that file to your Gemini API key (see `.env.example` for an example)
-5. Remove this line from the app's `build.gradle.kts` file: `signingConfig = signingConfigs.getByName("debugConfig")`
-6. Run the app on an emulator or physical device
+Pré-requisitos: Android Studio com Android SDK, JDK 17 e Gradle 9.3.1.
+
+Na raiz do projeto, execute:
+
+    gradle --no-daemon :app:assembleDebug
+
+O APK de depuração será gerado em:
+
+    app/build/outputs/apk/debug/app-debug.apk
+
+Não instale um arquivo com extensão .apk se ele não tiver sido gerado por uma build concluída com sucesso.
+
+## Build automático
+
+O GitHub Actions executa uma build de depuração em pushes, pull requests e manualmente. Quando a execução terminar com sucesso, baixe o artefato wenlang-debug-apk na seção Artifacts da execução.
+
+## Configuração de serviços
+
+Crie um arquivo .env na raiz e configure as chaves necessárias conforme .env.example. A ausência de credenciais de serviços pode limitar funcionalidades online, mas não deve ser confundida com a geração/instalação do APK.
